@@ -1,0 +1,26 @@
+[
+  {
+    "conversations": [
+      {
+        "from": "human",
+        "value": "你好"
+      },
+      {
+        "from": "gpt",
+        "value": "你好！"
+      }
+    ]
+  },
+  {
+    "conversations": [
+      {
+        "from": "human",
+        "value": "中国首都是哪？"
+      },
+      {
+        "from": "gpt",
+        "value": "中国首都是北京"
+      }
+    ]
+  }
+]
