@@ -68,22 +68,23 @@ Environment="HTTPS_PROXY=http://127.0.0.1:7890"
 
 ## Unsloth离线运行相关设置
 
-为了让**unsloth**可以离线运行（有时这是必要的，因为代理有时候不能正常工作），需要添加两个环境变量。
+为了让**unsloth**可以离线运行（有时这是必要的，因为代理有时候不能正常工作），需要添加一些环境变量。
 
-在`notebook.service`的`[Service]`字段添加如下两行：
+在`notebook.service`的`[Service]`字段添加如下三行：
 
 ```
 Environment="UNSLOTH_DISABLE_STATISTICS="""
 Environment="HF_HUB_OFFLINE="1""
+Environment="TRANSFORMERS_OFFLINE="1""
 ```
 
-前者与**unsloth**库相关，后者与**huggingface**库相关，相关网址：
+相关网址：
 
 [https://huggingface.co/docs/transformers/main/installation#offline-mode](https://huggingface.co/docs/transformers/main/installation#offline-mode)
 
 [https://github.com/unslothai/unsloth/blob/69a64758e56fe94f103cb00da078db27ff886cf3/unsloth/models/_utils.py#L1001](https://github.com/unslothai/unsloth/blob/69a64758e56fe94f103cb00da078db27ff886cf3/unsloth/models/_utils.py#L1001)
 
-需要注意的是如果设置了上述两个环境变量会在下载新模型时导致问题，建议下载新模型时手动先在代码中删除这两个环境变量。
+需要注意的是如果设置了上述环境变量会在下载新模型时导致问题，建议使用代码下载新模型时手动先在代码中删除这两个环境变量，或者使用**huggingface cli**下载模型。
 
 ## 一些常用快捷键
 

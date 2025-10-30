@@ -1,0 +1,12 @@
+[
+  {
+    "instruction": "判断以下句子的情感色彩。",
+    "input": "这家餐厅的食物味道很棒！",
+    "output": "正面"
+  },
+  {
+    "instruction": "将以下英文翻译成中文。",
+    "input": "Hello, world!",
+    "output": "你好，世界！"
+  }
+]
