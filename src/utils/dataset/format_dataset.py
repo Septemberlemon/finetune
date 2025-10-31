@@ -5,7 +5,7 @@ def format_dataset(dataset, tokenizer, conversations_key_name="conversations", s
     def formatting_prompts_func(examples):
         conversations = examples[conversations_key_name]
         texts = [tokenizer.apply_chat_template(cs, tokenize=False, add_generation_prompt=False) for cs in conversations]
-        return {"text": texts}
+        return {"text": texts, }
 
     if sharegpt_style:
         dataset = standardize_sharegpt(dataset)

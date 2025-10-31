@@ -41,5 +41,5 @@ hf download repo_id
 hf downlaod unsloth/Qwen3-14B
 ```
 
-repo_id即为模型仓库名，可直接从官网拷贝。
+`repo_id`即为模型仓库名，可直接从官网拷贝。
 下载来的模型的**保存位置**为`~/.cache/huggingface/hub`
