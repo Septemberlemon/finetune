@@ -453,7 +453,7 @@ dataset = dataset.map(formatting_prompts_func, batched=True)
 
 上述代码将会把`formatting_prompts_func`这个函数作用于`Dataset`对象上，返回一个作用后的新对象
 
-不妨称被**map**作用的函数为**format**，**format**函数接收一个参数，**map**方法执行的时候，会多次调用**format**函数，向其内部传参。传参的内容会因为**batched**参数的不同而不同，具体来说，当**batched**为**False**时，**format**函数接收的参数是一个`datasets.formatting.formatting.LazyRow`对象，它包含的是数据集中单个样本的信息；当**batched**为**True**时，**format**函数接收的参数是一个`datasets.formatting.formatting.LazyBatch`对象，它包含的是数据集中一批样本的信息，所以可以根据**batched**参数的不同，采用下述两种形式的函数：
+不妨称被**map**作用的函数为**format**，**format**函数接收一个参数，**map**方法执行的时候，会多次调用**format**函数，向其内部传参。传参的内容会因为**batched**参数的不同而不同，具体来说，当**batched**为**False**时，**format**函数接收的参数是一个`datasets.formatting.formatting.LazyRow`对象（类似字典），它包含的是数据集中单个样本的信息；当**batched**为**True**时，**format**函数接收的参数是一个`datasets.formatting.formatting.LazyBatch`对象，它包含的是数据集中一批样本的信息，所以可以根据**batched**参数的不同，采用下述两种形式的函数：
 
 ```python
 def format(examples):
@@ -481,6 +481,53 @@ dataset.map(format_single, batched=False)
 
 #### batched=False
 
-内部可以直接将`example`作为一个独立的样本使用，通过**特征名**索引样本中特定特征的值，并用其进行运算，最后返回一个字典。在函数内部对样本进行的修改将会生效，后续返回的字典将会被被合并到
+内部的参数`example`类型为`datasets.formatting.formatting.LazyRow`，代表一个独立的样本，可以当作字典使用，通过**特征名**可以索引样本中特定特征的值，并用其进行运算。函数最后应该返回一个字典或者`datasets.formatting.formatting.LazyRow`。在函数内部对样本进行的修改将会生效，函数返回的字典或`datasets.formatting.formatting.LazyRow`将会被被合并到到样本中（**若有重复键则覆盖**），如：
+
+```python
+def format_single(example):
+    return {"text_length": len(example["conversations"])}
+```
+
+或者：
+
+```python
+def format_single(example):
+    example['text_length'] = len(example['conversations'])
+    return example
+```
+
+都可以为样本添加`text_length`字段
+
+**注意若是函数返回值为*None*或者无返回值，函数内部对样本的修改将无效**
+
+**建议使用返回新字段的方式进行修改而非在函数内部修改，以保持清晰的结构**
 
 #### batched=True
+
+内部的参数`examples`类型为`datasets.formatting.formatting.LazyBatch`，代表一批样本，也可以当作字典使用。不同的是使用**特征名**索引将得到一个列表对象，列表中每个元素为特定特征的值。函数最后应该返回一个字典或者`datasets.formatting.formatting.LazyBatch`，如果返回字典则应该保持字典的值是长度为`len(examples)`的列表，字典键将作为数据集中新特征的键名。在函数内部对**样本批**进行的修改也将生效，函数返回的字典或`datasets.formatting.formatting.LazyBatch`将会被合并到样本中（**若有重复键则覆盖**），如：
+
+```python
+def format(examples):
+    conversations = examples["conversations"]
+    text_length = [len(conversation) for conversation in conversations]
+    return {"text_length": text_length}
+```
+
+或者：
+
+```python
+def format(examples):
+    conversations = examples["conversations"]
+    examples["text_length"] = [len(conversation) for conversation in conversations]
+    return examples
+```
+
+都能为样本添加`text_length`字段
+
+**注意若是函数返回值为*None*或者无返回值，函数内部对样本批的修改将无效**
+
+**仍然建议使用返回新字段的方式以保持代码结构清晰**
+
+若要移除一些字段，可以使用**map**函数的`remove_columns`参数，用`str`或者`list[str]`指定要删除的键名即可，**该参数只能用于指定数据集中原本拥有的字段**
+
+**建议一直指定`batched=True`，因为它更快：函数调用次数少导致开销小、有一些专门用于快速批量处理的接口可供调用以提速**
