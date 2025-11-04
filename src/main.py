@@ -18,7 +18,7 @@ words_to_test = [
     "Zwetschgenkrampus",  # Complex compound word
     "nimmamea"  # Dialect
 ]
-
+tokenizer.convert_tokens_to_ids(words_to_test)
 # --- 3. 循环遍历每个词，进行分词并评估 ---
 print("--- Tokenization Analysis ---")
 for word in words_to_test:
