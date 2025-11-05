@@ -167,6 +167,13 @@ print(encoded_input)
 
 `padding`：指定填充，设定为`True`后会将编码后**token**数量小于特定值的**token**序列进行填充，补充长度到特定值，这里的特定值**所有token序列长度中的最大值**；设定为`"max_length"`后会将长度填充为`"max_length"`；填充的**token**为一个特殊的专门用于填充的**token**，可以通过`tokenizer.all_special_tokens`查看所有特殊**token**，其中就包含用于填充的**token**对应的字符串，它往往是一个包含**“pad“**的字符串；默认在**token**序列的左边进行填充，可以通过指定`tokenizer.padding_side = "right"`指定在序列右边进行填充，默认使用左填充是因为新生成的**token**可以直接在后面拼接，使用右填充若是直接在后面拼接将会导致新生成的**token**和输入**token**序列中间包含若干填充**token**
 
+`return_offsets_mapping`：指定此参数为`True`后，将会在返回的对象中增添一个键值对，键为`"offsets_mapping"`，值为一个**list[tuple[int]]**或者**list[list[tuple[int]]]**（这取决于传进去的是字符串还是字符串列表），代表分词切分位置对应的原字符串中的位置索引，如：
+
+```shell
+'offset_mapping': [(0, 2), (2, 4), (4, 5), (5, 6)]
+'offset_mapping': [[(0, 2), (2, 4), (4, 5), (5, 6)], [(0, 2), (2, 3), (3, 4), (4, 6), (6, 8)]]
+```
+
 `return_tensor`：用于指定返回的`"input_ids"`和`"attention_mask"`的类型，它们默认是嵌套列表，可以通过指定此参数为`pt`、`tf`、`np`分别指定返回的对象类型为`torch.tensor`、`tensorflow.tensor`、`numpy.ndarray`，注意，如果没有指定`truncation`或者`padding`，则可能会因为句子编码后的**token**序列的长度不同而无法将嵌套列表转为张量，例如：
 
 ```python
@@ -201,6 +208,8 @@ print(encoded_input)
         	   [1, 1, 1, 1, 1]])
 }
 ```
+
+此外如果返回的除了这二者还有其他键值对（如前面的**offsets_mapping**），其也会被一并转换为相应类型
 
 ##### tokenizer.tokenize方法
 
@@ -328,7 +337,7 @@ print(tokenizer.convert_ids_to_tokens(151654))
 
 ##### tokenizer.decode方法
 
-此方法接收一个代表**token_id**序列的整数列表，将其解码为**token**列表并合并为一个字符串，如：
+此方法接收一个代表**token_id**序列的、类型为**list[int]**、**np.ndarray**、**torch.tensor**等（基本上直接拿**tokenizer**对字符串直接作用返回的`input_ids`就行了）的对象，将其解码为**token**列表并合并为一个**能正常显示非英文字符**字符串，如：
 
 ```python
 prompt = "今天天气真好"
@@ -344,7 +353,7 @@ print(tokenizer.decode(input_ids))
 
 ##### tokenizer.batch_decode方法
 
-此方法接收一个二级嵌套整数列表，将其解码为**token**并各自合并为字符串，再放进一个列表种返回，如：
+此方法接收一个代表**token_ids**序列的、**二级嵌套的**、类型为**list[int]**、**np.ndarray**、**torch.tensor**等（基本上直接拿**tokenizer**对字符串列表直接作用返回的`input_ids`就行了）的对象，将其解码为**token**并各自合并为**能正常显示非英文字符**的字符串，再放进一个列表中返回，如：
 
 ```python
 prompts = ["今天天气真好", "法国的首都是巴黎"]
@@ -356,6 +365,37 @@ print(tokenizer.batch_decode(tokenizer(prompts)["input_ids"]))
 ```shell
 ['今天天气真好', '法国的首都是巴黎']
 ```
+
+此外如果对一个一级列表作用，它将得到能正常显示非英文字符的分词结果：
+
+```python
+prompt = "今天天气真好"
+tokenizer.batch_decode(tokenizer(prompt)["input_ids"])
+```
+
+这将得到：
+
+```shell
+['今天', '天气', '真', '好']
+```
+
+这是因为`batch_decode`内部对传进去的列表的每一项分别做`decode`在合并进一个列表返回的原因，而对一个以及列表来说，其内部的每一个`input_id`做`decode`的结果就是其对应的**能正常显示的非英文字符串**，在放进列表中返回就得到了能正常显示的分词结果，也可以自己用`decode`处理：
+
+```python
+prompt = "今天天气真好"
+input_ids = tokenizer(prompt)["input_ids"]
+print([tokenizer.decode(input_id) for input_id in input_ids])
+```
+
+这也将得到**能正常显示非英文字符**的分词结果：
+
+```shell
+['今天', '天气', '真', '好']
+```
+
+此外也可以通过前面介绍过的`return_offsets_mapping`参数拿到返回的**offset_mapping**，然后据其从原字符串中手动切分出**能正常显示非英文字符**的分词结果
+
+对于批量的字符串分词，要正确显示非英文字符，采用上述三种方法迭代处理即可
 
 #### 保存分词器
 
@@ -369,5 +409,25 @@ tokenizer.save_pretrained("tokenizer")
 
 #### apply_chat_template方法
 
-聊天模板是**chat**模型的相关方法
+聊天模板是对话类语言模型的分词器带有的方法，用于将一个包含多轮对话的列表转换为预设的特定格式的字符串，**这个接口在数据处理阶段非常常用**
 
+首先使用`tokenizer.chat_template`查看其聊天模板，若没有此属性通常表明此分词器不是对话类语言模型的分词器，无法使用`apply_chat_template`方法
+
+`tokenizer.chat_template`的输出是一个字符串，它采用**Jinja2**模板语言定义了对话的格式化规则，形如：
+
+```jinja2
+{% for message in messages %}
+    {% if message['role'] == 'user' %}
+        {{'<|im_start|>user\n' + message['content'] + '<|im_end|>\n'}}
+    {% elif message['role'] == 'assistant' %}
+        {{'<|im_start|>assistant\n' + message['content'] + '<|im_end|>\n' }}
+    {% else %}
+        {{ '<|im_start|>system\n' + message['content'] + '<|im_end|>\n' }}
+    {% endif %}
+{% endfor %}
+{% if add_generation_prompt %}
+    {{ '<|im_start|>assistant\n' }}
+{% endif %}
+```
+
+jinj
