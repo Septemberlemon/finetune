@@ -114,11 +114,58 @@ model = AutoModelForCausalLM.from_pretrained(local_path)
 
 优先级为先检查传入的参数是否为本地文件夹，再检查**Hub**是否有对应仓库
 
+***
+
 ### 关于tokenizer
 
-现代**llm**的分词是在字节层面进行的，这意味着所谓的一个**token**明确对应着的是一个字节序列，这个字节序列对应一个**token_id**，在推理和训练时，会将输入字符串通过**utf-8**编码转为字节流，在字节流上切分出若干字节序列作为**token**，再将**token**转为**token_id**送入模型，模型处理后拿到的**token_id**再通过分词器转为字节序列，最后把字节序列对应回字符序列（对于非流式推理来说，会先拿到完整的字节流再解码回字符串；对于流式推理，会采用缓冲接收的方式输出字符序列）
+从字符串到**token_id**列表的过程往往需要经历下述过程：
 
-拿到**tokenizer**后，可以用它进行编码和解码两种工作，下面分别介绍：
+**Normalizer → PreTokenizer → Model (BPE merges) → PostProcessor**
+
+* **Normalizer**部分会对字符串做一些预处理，它接收原始字符串，输出预处理后的字符串
+
+* **Pretokenizer**接收处理后的字符串，例如`"今天天气真好,I wanna go swimming"`，按照一定的规则将字符串拆为若干块子字符串（例如按照空格分割），拿到类似于` ['今天', '天气', '真', '好', ',I', ' wanna', ' go', ' swimming']`这样的切分，接着它会做一个映射，将每个子字符串转为字节流，再将每个字节流按照一个字节对应一个**可打印字符**的映射关系做映射，得到`['ä»Ĭå¤©å¤©æ°ĶçľŁå¥½', ',I', 'Ġwanna', 'Ġgo', 'Ġswimming']`作为输出，这被称为**pre-token**，具体字节到**可打印字符**的映射关系见后文，此外它输出时还会带上**offset_mapping**作为记录每个子字符串对应原字符串中的索引位置的信息，实际输出为：
+
+    `[('ä»Ĭå¤©å¤©æ°ĶçľŁå¥½', (0, 6)), (',I', (6, 8)), ('Ġwanna', (8, 14)), ('Ġgo', (14, 17)), ('Ġswimming', (17, 26))]`
+
+    上述输出使用代码：`print(tokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str("今天天气真好,I wanna go swimming"))`得到
+
+* **Model(BPE merges)**是实际负责分词的模型部分，它拿到上一步输出的**pre-tokens**和**offset_mapping**，在每个**pre-token**内部使用**BPE**算法进行进一步的拆分（或者说合并，这取决于看待每个**pre-token**的方式），拿到最终的**tokens**：`['ä»Ĭå¤©','å¤©æ°Ķ','çľŁ','å¥1⁄2','ï1⁄4Į','I','Ġwanna','Ġgo','Ġswimming']`
+
+    使用代码：
+
+    `print(tokenizer.tokenize("今天天气真好,I wanna go swimming"))`
+
+    拿到输出的**tokens**：
+
+    `['ä»Ĭå¤©', 'å¤©æ°Ķ', 'çľŁ', 'å¥½', ',I', 'Ġwanna', 'Ġgo', 'Ġswimming']`
+
+    最后它会将每个**token**对应到**token_id**，得到最终输出：
+
+    `[100644, 104307, 88051, 52801, 37768, 32733, 728, 23380]`
+
+    使用代码：
+
+    `print(tokenizer("今天天气真好,I wanna go swimming")["input_ids"])`可以拿到上述**token_ids**输出
+
+    并且它也会对**offset_mapping**进行处理，使用下述代码：
+
+    `print(tokenizer("今天天气真好,I wanna go swimming", return_attention_mask=False, return_offsets_mapping=True))`
+
+    拿到输出：
+
+    ```
+    {
+    	'input_ids': [100644, 104307, 88051, 52801, 37768, 32733, 728, 23380], 
+    	'offset_mapping': [(0, 2), (2, 4), (4, 5), (5, 6), (6, 8), (8, 14), (14, 17), (17, 26)]
+    }
+    ```
+
+* **PostProcessor**会做一些后处理，它是和**Normalizer**一样是非必要的
+
+上述介绍的是在字节层面进行的分词，实际上也有很多其他方法，但**byte-level**是目前最主流的方法，因为在**BPE**阶段按照词表进行合并，且未合并的字符保持为单个字符，而单个字符也在词表中，它完全的避免了**oov**。
+
+拿到分词器对字符串编码后的**token_id**列表后，将其喂给真正负责语言逻辑处理的模型，拿到输出的**token_id**再调用**tokenizer**进行解码，解码部分为将**token_id**转为**token**，再按照特定映射（下文有映射表）映射回字节流，再将字节流转为人类可读的字符串
 
 #### 正向编码
 
@@ -174,7 +221,7 @@ print(encoded_input)
 'offset_mapping': [[(0, 2), (2, 4), (4, 5), (5, 6)], [(0, 2), (2, 3), (3, 4), (4, 6), (6, 8)]]
 ```
 
-`return_tensor`：用于指定返回的`"input_ids"`和`"attention_mask"`的类型，它们默认是嵌套列表，可以通过指定此参数为`pt`、`tf`、`np`分别指定返回的对象类型为`torch.tensor`、`tensorflow.tensor`、`numpy.ndarray`，注意，如果没有指定`truncation`或者`padding`，则可能会因为句子编码后的**token**序列的长度不同而无法将嵌套列表转为张量，例如：
+`return_tensors`：用于指定返回的`"input_ids"`和`"attention_mask"`的类型，它们默认是嵌套列表，可以通过指定此参数为`pt`、`tf`、`np`分别指定返回的对象类型为`torch.tensor`、`tensorflow.tensor`、`numpy.ndarray`，注意，如果没有指定`truncation`或者`padding`，则可能会因为句子编码后的**token**序列的长度不同而无法将嵌套列表转为张量，例如：
 
 ```python
 prompts = ["今天天气真好", "法国的首都是巴黎"]
@@ -226,7 +273,7 @@ print(tokenizer.tokenize(prompt))
 ['ä»Ĭå¤©', 'å¤©æ°Ķ', 'çľŁ', 'å¥½']
 ```
 
-前面提到过现代**llm**的分词都是在字节层面进行的，“今天天气真好“被**utf-8**编码为字节流后进行切分，得到**4**个字节序列，上述**4**个西文字母序列即为**4**个字节序列的对应结果，对应规则并非某种编码，而是专门定义的单字节到**便于打印**字符的映射：
+下面是单字节到**便于打印**字符的映射：
 
 ```python
 def bytes_to_unicode():
@@ -379,7 +426,7 @@ tokenizer.batch_decode(tokenizer(prompt)["input_ids"])
 ['今天', '天气', '真', '好']
 ```
 
-这是因为`batch_decode`内部对传进去的列表的每一项分别做`decode`在合并进一个列表返回的原因，而对一个以及列表来说，其内部的每一个`input_id`做`decode`的结果就是其对应的**能正常显示的非英文字符串**，在放进列表中返回就得到了能正常显示的分词结果，也可以自己用`decode`处理：
+这是因为`batch_decode`内部对传进去的列表的每一项分别做`decode`在合并进一个列表返回的原因，而对一个一级列表来说，其内部的每一个`input_id`做`decode`的结果就是其对应的**能正常显示的非英文字符串**，在放进列表中返回就得到了能正常显示的分词结果，也可以自己用`decode`处理：
 
 ```python
 prompt = "今天天气真好"
@@ -420,9 +467,9 @@ tokenizer.save_pretrained("tokenizer")
     {% if message['role'] == 'user' %}
         {{'<|im_start|>user\n' + message['content'] + '<|im_end|>\n'}}
     {% elif message['role'] == 'assistant' %}
-        {{'<|im_start|>assistant\n' + message['content'] + '<|im_end|>\n' }}
+        {{'<|im_start|>assistant\n' + message['content'] + '<|im_end|>\n'}}
     {% else %}
-        {{ '<|im_start|>system\n' + message['content'] + '<|im_end|>\n' }}
+        {{'<|im_start|>system\n' + message['content'] + '<|im_end|>\n'}}
     {% endif %}
 {% endfor %}
 {% if add_generation_prompt %}
@@ -430,4 +477,84 @@ tokenizer.save_pretrained("tokenizer")
 {% endif %}
 ```
 
-jinj
+**jinja2**是一种模板语言，也是一种模板引擎，它的语法简单，这里用于定义聊天模板的格式
+
+使用`apply_chat_template`方法，它接收一个**list[dict[str, str]]**，将其按照**chat_template**中定义的模板进行转为单个字符串输出。它也可以接收一个**list[list[dict[str, str]]]**，返回对其中每个**list[dict[str, str]]**分别处理后的字符串构成的列表，如：
+
+```python
+conversations = [{'role': 'user', 'content': '你好'}, {'role': 'assistant', 'content': '你好，有什么可以帮您的？'}]
+formatted_string = tokenizer.apply_chat_template(conversations, tokenize=False)
+print(formatted_string)
+```
+
+这将得到一个字符串：
+
+```text
+<|im_start|>user
+你好<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+你好，有什么可以帮您的？<|im_end|>
+
+```
+
+这就是按照聊天模板格式化后的字符串
+
+`tokenize`参数默认为`True`，当其为`True`时，其输出将为一个**list[int]**：
+
+```text
+[151644, 872, 198, 108386, 151645, 198, 151644, 77091, 198, 151667, 271, 151668, 271, 108386, 3837, 104139, 73670, 99663, 101214, 11319, 151645, 198]
+```
+
+它实际上对应的是上述字符串被**tokenizer**作用后的结果，即：
+
+`tokenizer(tokenizer.apply_chat_template(conversations, tokenize=False))["input_ids"]`
+
+通过解码可以查看其对应分词结果：
+
+```python
+print(tokenizer.batch_decode(tokenizer.apply_chat_template(conversations)))
+```
+
+```text
+['<|im_start|>', 'user', '\n', '你好', '<|im_end|>', '\n', '<|im_start|>', 'assistant', '\n', '<think>', '\n\n', '</think>', '\n\n', '你好', '，', '有什么', '可以', '帮', '您的', '？', '<|im_end|>', '\n']
+```
+
+`return_tensors`：这是`apply_chat_template`的一个重要参数，用于指定返回的**token_ids**的类型，类似于前面介绍过的直接调用`tokenizer`的同名参数，一般要喂给模型，指定其为`"pt"`即可。指定该参数为`"pt"`之后，即使`conversations`是一个**list[dict[str, str]]**而非**list[list[dict[str, str]]]**，其也将返回一个二维张量（**shape**为`torch.Size([1, n])`），这是因为后续的`model.generate`拒绝处理一维张量，需要在外层**unsqueeze**一层**batch_size**维度
+
+`add_generation_prompt`：该参数默认为**False**，指定其为**True**之后，将会在返回的**token_ids**后面添加一些**tokens_ids**，它们对应着所谓的**”generation_prompt**，具体内容取决于**chat_template**，举例来说：
+
+```python
+token_ids_with_generation_prompt = tokenizer.apply_chat_template(conversations, add_generation_prompt=True)
+print(tokenizer.batch_decode(token_ids_with_generation_prompt))
+```
+
+这将得到：
+
+```text
+['<|im_start|>', 'user', '\n', '在', '忙', '什么呢', '<|im_end|>', '\n', '<|im_start|>', 'assistant', '\n', '在', '想', '某个', '笨', '蛋', '有没有', '想', '我', '呀', '<|im_end|>', '\n', '<|im_start|>', 'user', '\n', '少', '来', ',', '说', '正', '经', '的', '<|im_end|>', '\n', '<|im_start|>', 'assistant', '\n', '想', '你', '就是', '最', '正', '经', '的事', '嘛', '\n', '不然', ',', '你现在', '过来', '\n', '我', '告诉你', '我在', '干嘛', '<|im_end|>', '\n', '<|im_start|>', 'user', '\n', '现在', '过去', '不方便', '吧', '<|im_end|>', '\n', '<|im_start|>', 'assistant', '\n', '怎么会', '不方便', '\n', '我', '随时', '都', '方便', '\n', '难道', '哥哥', '怕', '了', '<|im_end|>', '\n', '<|im_start|>', 'user', '\n', '怕', '你', '什么', '<|im_end|>', '\n', '<|im_start|>', 'assistant', '\n', '怕', '我', '吃了', '你', '呀', '\n', '快来', ',', '给你', '留', '了', '门', '<|im_end|>', '\n', '<|im_start|>', 'user', '\n', '地址', '发', '我', '<|im_end|>', '\n', '<|im_start|>', 'assistant', '\n', '<think>', '\n\n', '</think>', '\n\n', '就知道', '你', '嘴', '硬', '\n', '定位', '发', '你', '啦', ',', '宝贝', '快', '点', '哦', '<|im_end|>', '\n', '<|im_start|>', 'assistant', '\n']
+```
+
+可以看到末尾多了一些**token**：`'<|im_start|>', 'assistant', '\n'`，这就是所谓的**generation_prompt**，它用于提示模型该作为助手回答前文的问题，而不是普通的续写。若指定了`tokenize`为**False**且指定了此参数为**True**，则会将多出来的**tokens**拼接到输出的字符串后面
+
+***
+
+### 关于model
+
+这是真正负责处理语言逻辑的部分，在**tokenizer**对字符串处理后要将**token_ids**交由模型进行续写，模型输出**token_id**并返回给**tokenizer**进行解码
+
+前面介绍了使用`AutoModelForCausalLM.from_pretrained`方法加载模型的方法，下面介绍该方法的一些参数：
+
+`device_map`：此参数用于指定将模型的各部分分别加载到哪个设备上，不显式指明该参数，模型将会被全部加载到内存中，其**device**为**cpu**。指定该参数为**”auto"**，库将自动检查可用硬件资源，优先加载到显存中并指定**device**为**cuda**，后续显存不足将会把其余部分**offload**到内存中
+
+`dtype`：此参数用于指定模型的参数的数据类型，**默认为`torch.float32`**。指定其为**auto**后将会根据模型配置文件中指定的数据类型进行加载。加载后可使用`print(model.dtype)`查看其值
+
+建议将二者都指定为**auto**
+
+***
+
+#### generate方法
+
