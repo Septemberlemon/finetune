@@ -130,7 +130,7 @@ model = AutoModelForCausalLM.from_pretrained(local_path)
 
     上述输出使用代码：`print(tokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str("今天天气真好,I wanna go swimming"))`得到
 
-* **Model(BPE merges)**是实际负责分词的模型部分，它拿到上一步输出的**pre-tokens**和**offset_mapping**，在每个**pre-token**内部使用**BPE**算法进行进一步的拆分（或者说合并，这取决于看待每个**pre-token**的方式），拿到最终的**tokens**：`['ä»Ĭå¤©','å¤©æ°Ķ','çľŁ','å¥1⁄2','ï1⁄4Į','I','Ġwanna','Ġgo','Ġswimming']`
+* **Model(BPE merges)**是实际负责分词的模型部分，它拿到上一步输出的**pre-tokens**和**offset_mapping**，在每个**pre-token**内部使用**BPE**算法进行进一步的拆分（或者说合并，这取决于看待每个**pre-token**的方式），拿到最终的**tokens**（该算法更关心频率而非语意相关性）：`['ä»Ĭå¤©','å¤©æ°Ķ','çľŁ','å¥1⁄2','ï1⁄4Į','I','Ġwanna','Ġgo','Ġswimming']`
 
     使用代码：
 
@@ -477,7 +477,7 @@ tokenizer.save_pretrained("tokenizer")
 {% endif %}
 ```
 
-**jinja2**是一种模板语言，也是一种模板引擎，它的语法简单，这里用于定义聊天模板的格式
+**jinja2**是一种模板语言，也是一种模板引擎，它的语法非常直观，这里用于定义聊天模板的格式
 
 使用`apply_chat_template`方法，它接收一个**list[dict[str, str]]**，将其按照**chat_template**中定义的模板进行转为单个字符串输出。它也可以接收一个**list[list[dict[str, str]]]**，返回对其中每个**list[dict[str, str]]**分别处理后的字符串构成的列表，如：
 
@@ -501,7 +501,7 @@ print(formatted_string)
 
 ```
 
-这就是按照聊天模板格式化后的字符串
+这就是按照聊天模板格式化后的字符串，第一个参数一定要指定为要输入的列表，或者用`conversation`参数名指定
 
 `tokenize`参数默认为`True`，当其为`True`时，其输出将为一个**list[int]**：
 
@@ -525,7 +525,20 @@ print(tokenizer.batch_decode(tokenizer.apply_chat_template(conversations)))
 
 `return_tensors`：这是`apply_chat_template`的一个重要参数，用于指定返回的**token_ids**的类型，类似于前面介绍过的直接调用`tokenizer`的同名参数，一般要喂给模型，指定其为`"pt"`即可。指定该参数为`"pt"`之后，即使`conversations`是一个**list[dict[str, str]]**而非**list[list[dict[str, str]]]**，其也将返回一个二维张量（**shape**为`torch.Size([1, n])`），这是因为后续的`model.generate`拒绝处理一维张量，需要在外层**unsqueeze**一层**batch_size**维度
 
-`add_generation_prompt`：该参数默认为**False**，指定其为**True**之后，将会在返回的**token_ids**后面添加一些**tokens_ids**，它们对应着所谓的**”generation_prompt**，具体内容取决于**chat_template**，举例来说：
+**除了上述的参数，此方法还有另外一种参数，它们会被传给chat_template用于具体的渲染，这意味着不同的chat_template将会能处理不同的参数，要依据其内容具体而定**，举例来说，**unsloth/Qwen3-14B**的**chat_template**中有这么一段内容：
+
+```jinja2
+{%- if add_generation_prompt %}
+    {{- '<|im_start|>assistant\n' }}
+    {%- if enable_thinking is defined and enable_thinking is false %}
+        {{- '<think>\n\n</think>\n\n' }}
+    {%- endif %}
+{%- endif %}
+```
+
+里面用到了`add_generation_prompt`和`enable_thinking`两个参数，并指明了具体的使用逻辑，这意味着你将可以给`apply_chat_template`方法传递这两个参数：
+
+`add_generation_prompt`：该参数的默认值为**False**（它不是可变关键字参数，所以有默认值，但是它也能在**chat_template**被用到），根据上述**chat_template**，指定其为**True**之后，将会在返回的**token_ids**后面添加一些**tokens_ids**，它们对应着所谓的**”generation_prompt“**，具体内容取决于上述**chat_template**，举例来说：
 
 ```python
 token_ids_with_generation_prompt = tokenizer.apply_chat_template(conversations, add_generation_prompt=True)
@@ -535,10 +548,23 @@ print(tokenizer.batch_decode(token_ids_with_generation_prompt))
 这将得到：
 
 ```text
-['<|im_start|>', 'user', '\n', '在', '忙', '什么呢', '<|im_end|>', '\n', '<|im_start|>', 'assistant', '\n', '在', '想', '某个', '笨', '蛋', '有没有', '想', '我', '呀', '<|im_end|>', '\n', '<|im_start|>', 'user', '\n', '少', '来', ',', '说', '正', '经', '的', '<|im_end|>', '\n', '<|im_start|>', 'assistant', '\n', '想', '你', '就是', '最', '正', '经', '的事', '嘛', '\n', '不然', ',', '你现在', '过来', '\n', '我', '告诉你', '我在', '干嘛', '<|im_end|>', '\n', '<|im_start|>', 'user', '\n', '现在', '过去', '不方便', '吧', '<|im_end|>', '\n', '<|im_start|>', 'assistant', '\n', '怎么会', '不方便', '\n', '我', '随时', '都', '方便', '\n', '难道', '哥哥', '怕', '了', '<|im_end|>', '\n', '<|im_start|>', 'user', '\n', '怕', '你', '什么', '<|im_end|>', '\n', '<|im_start|>', 'assistant', '\n', '怕', '我', '吃了', '你', '呀', '\n', '快来', ',', '给你', '留', '了', '门', '<|im_end|>', '\n', '<|im_start|>', 'user', '\n', '地址', '发', '我', '<|im_end|>', '\n', '<|im_start|>', 'assistant', '\n', '<think>', '\n\n', '</think>', '\n\n', '就知道', '你', '嘴', '硬', '\n', '定位', '发', '你', '啦', ',', '宝贝', '快', '点', '哦', '<|im_end|>', '\n', '<|im_start|>', 'assistant', '\n']
+['<|im_start|>', 'user', '\n', '你好', '<|im_end|>', '\n', '<|im_start|>', 'assistant', '\n', '<think>', '\n\n', '</think>', '\n\n', '你好', '，', '有什么', '可以', '帮', '您的', '？', '<|im_end|>', '\n', '<|im_start|>', 'assistant', '\n']
 ```
 
-可以看到末尾多了一些**token**：`'<|im_start|>', 'assistant', '\n'`，这就是所谓的**generation_prompt**，它用于提示模型该作为助手回答前文的问题，而不是普通的续写。若指定了`tokenize`为**False**且指定了此参数为**True**，则会将多出来的**tokens**拼接到输出的字符串后面
+可以看到末尾多了一些**token**：`'<|im_start|>', 'assistant', '\n'`，这就是所谓的**generation_prompt**，它用于提示模型该作为助手回答前文的问题，而不是普通的续写。
+
+`enable_thinking`：根据上述**chat_template**，该参数必须在`add_generation_prompt`指定为**True**且其自身指定为**False**时才会产生影响，它将在后面加上字符串`"<think>\n\n</think>\n\n"`对应的**token_ids**，这将使得模型接下来处理的时候跳过思考阶段，这是一种直观的方法：
+
+```python
+token_ids_with_generation_prompt_and_empty_thinking = tokenizer.apply_chat_template(conversations, add_generation_prompt=True)
+print(tokenizer.batch_decode(token_ids_with_generation_prompt))
+```
+
+```text
+['<|im_start|>', 'user', '\n', '你好', '<|im_end|>', '\n', '<|im_start|>', 'assistant', '\n', '<think>', '\n\n', '</think>', '\n\n', '你好', '，', '有什么', '可以', '帮', '您的', '？', '<|im_end|>', '\n', '<|im_start|>', 'assistant', '\n', '<think>', '\n\n', '</think>', '\n\n']
+```
+
+这些**chat_template**内部会用到的参数和`tokenize`、`return_tensors`作用是互相独立的
 
 ***
 
@@ -557,4 +583,47 @@ print(tokenizer.batch_decode(token_ids_with_generation_prompt))
 ***
 
 #### generate方法
+
+此方法用于生成，类似于本文档开头介绍过的直接调用`Pipeline`，它接收的首个参数为`"iputs"`，是一个二维的张量，视第一个维度为**batch_size**，视第二个维度为具体的**token_id**序列，其输出一个二维张量，第一个维度保持不变，在第二个维度上进行拓展，返回续写后的**token_id**序列，如：
+
+```python
+model_inputs = tokenizer(["A list of colors: red, blue"], return_tensors="pt").to(model.device)
+generated_ids = model.generate(model_inputs["input_ids"], max_new_tokens=50)
+print(tokenizer.batch_decode(generated_ids))
+```
+
+这将得到：
+
+```text
+["A list of colors: red, blue, green, yellow, black, white, orange, purple, pink, brown, gray, teal, magenta, cyan, indigo, violet, gold, silver.  How many colors are in the list? Let's count them one by"]
+```
+
+如果不指定`max_new_tokens`进行续写长度的限制，其将使用模型配置文件`generation_config.json`中指定的`max_length`进行限定，而`max_length`可能非常大，所以一般需要手动指定，另外也可以通过参数`max_length`进行限定。在到达上限之前，它可能因为生成了终止**token**而停止续写
+
+此外它也支持`top_p`、`top_k`、`temperature`三个参数，具体作用已经在本文档开头的**pipeline**部分介绍过
+
+此外，它还支持`attention_mask`参数，因此你可以采用这种写法：
+
+```python
+model_inputs = tokenizer(["A list of colors: red, blue"], return_tensors="pt").to(model.device)
+generated_ids = model.generate(**model_inputs, max_new_tokens=50)
+print(tokenizer.batch_decode(generated_ids))
+```
+
+注意力掩码在传递单个序列时全为**1**，在传递批量数据时，因为各序列长短不一，要进行**padding**（在前文直接调用`tokenizer`部分的`padding`参数介绍过）此时的掩码可能形如：
+
+```text
+tensor([[1, 1, 1, 1, 1, 1, 1, 1],
+        [0, 0, 0, 0, 1, 1, 1, 1]], device='cuda:0')
+```
+
+**此时应该传递掩码进去**
+
+`do_sample`：默认为**True**，为**True**时正常采样，为**False**时每一步都会选取概率最高的**token**
+
+`num_return_sequences`：默认为**1**，此参数用于指定每个样本的续写数量，举例来说，其为一的时候输出的**generated_ids**的**shape**若为`torch.Size([2, 58])`，则其为三的时候为`torch.Size([6, 58])`，其中沿着**batch_size**维度，前三个对应第一个序列的生成结果
+
+***
+
+
 
