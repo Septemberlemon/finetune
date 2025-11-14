@@ -126,3 +126,7 @@ vllm serve /home/u/.cache/huggingface/hub/models--unsloth--Qwen3-32B/snapshots/5
 **注意，运行上述命令后，将对外部提供两个模型api，Qwen3-32B 和 bad-woman，前者是不加载 LoRA 模型的接口，后者是加载 LoRA 模型的接口。**
 
 **若指定二者相同，则加载 LoRA 模型的接口优先。**
+
+#### 指定聊天模板
+
+**vllm**默认使用模型所处文件夹的聊天模板，并会在内部进行缓存，所以需要手动进行更改以实现自定义聊天模板，使用选项`--chat-template`，指定其值为聊天模板的文件路径，即可使用自定义聊天模板对输入进行处理

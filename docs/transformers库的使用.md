@@ -477,7 +477,7 @@ tokenizer.save_pretrained("tokenizer")
 {% endif %}
 ```
 
-**jinja2**是一种模板语言，也是一种模板引擎，它的语法非常直观，这里用于定义聊天模板的格式
+**jinja2**是一种模板语言，也是一种模板引擎，它的语法非常直观，详见本文档同级目录下的另一篇文档，这里用于定义聊天模板的格式
 
 使用`apply_chat_template`方法，它接收一个**list[dict[str, str]]**，将其按照**chat_template**中定义的模板进行转为单个字符串输出。它也可以接收一个**list[list[dict[str, str]]]**，返回对其中每个**list[dict[str, str]]**分别处理后的字符串构成的列表，如：
 
@@ -578,7 +578,7 @@ print(tokenizer.batch_decode(token_ids_with_generation_prompt))
 
 `dtype`：此参数用于指定模型的参数的数据类型，**默认为`torch.float32`**。指定其为**auto**后将会根据模型配置文件中指定的数据类型进行加载。加载后可使用`print(model.dtype)`查看其值
 
-建议将二者都指定为**auto**
+如果不进行量化加载，建议保持`dtype`为**auto**
 
 ***
 
@@ -623,7 +623,166 @@ tensor([[1, 1, 1, 1, 1, 1, 1, 1],
 
 `num_return_sequences`：默认为**1**，此参数用于指定每个样本的续写数量，举例来说，其为一的时候输出的**generated_ids**的**shape**若为`torch.Size([2, 58])`，则其为三的时候为`torch.Size([6, 58])`，其中沿着**batch_size**维度，前三个对应第一个序列的生成结果
 
+`streamer`：此参数用于流式打印，接收的对象为一个`TextStreamer`对象，使用`from transformers import TextStreamer`进行导入，将其传入`generate`方法即可进行流式生成：
+
+```python
+from transformers import TextStreamer
+
+message = [
+    {"role": "user", "content": "你好"}
+]
+text = tokenizer.apply_chat_template(
+    message,
+    tokenize=False,
+    add_generation_prompt=True,  # Must add for generation
+    enable_thinking=False,  # Disable thinking
+)
+outputs = model.generate(
+    **tokenizer(text, return_tensors="pt").to("cuda"),
+    max_new_tokens=256,  # Increase for longer outputs!
+    temperature=0.7, top_p=0.8, top_k=20,  # For non thinking
+    streamer=TextStreamer(tokenizer)
+)
+```
+
+它将自动流式打印生成结果：
+
+```text
+<|im_start|>user
+你好<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+你好！很高兴见到你！😊 有什么我可以帮你的吗？无论是聊天、解决问题，还是单纯想找个伴儿，我都在这儿！<|im_end|>
+```
+
+如果不需要打印前导提示词，可以指定`TextStreamer`的`skip_prompt`为**True**，即：
+```python
+outputs = model.generate(
+    **tokenizer(text, return_tensors="pt").to("cuda"),
+    max_new_tokens=256,  # Increase for longer outputs!
+    temperature=0.7, top_p=0.8, top_k=20,  # For non thinking
+    streamer=TextStreamer(tokenizer, skip_prompt=True)
+)
+```
+
+这将单纯打印新生成的内容：
+```text
+你好！很高兴见到你！😊 有什么我可以帮你的吗？无论是聊天、解决问题，还是单纯想找个伴儿，我都在这儿！✨<|im_end|>
+```
+
+需要注意的是因为`<|im_end|>`是终止**token**，所以生成到此中止了，如果要忽略结尾的`<|im_end|>`，可以指定参数`skip_special_tokens`为**True**，它将忽略一切特殊**token**的打印：
+
+```python
+outputs = model.generate(
+    **tokenizer(text, return_tensors="pt").to("cuda"),
+    max_new_tokens=256,  # Increase for longer outputs!
+    temperature=0.7, top_p=0.8, top_k=20,  # For non thinking
+    streamer=TextStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
+)
+```
+
+```text
+你好！很高兴见到你。有什么我可以帮你的吗？😊
+```
+
+最终拿到的返回值`outputs`是一个二维张量，使用`batch_deocde`即可解码：
+
+```python
+print(tokenizer.batch_decode(outputs))
+```
+
+这将得到：
+
+```text
+['<|im_start|>user\n你好<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n你好！很高兴见到你！😊 有什么我可以帮你的吗？无论是聊天、解决问题，还是单纯想找个伴儿聊聊，我都很乐意！<|im_end|>']
+```
+
+如果要实时拿到新生成的**token**而非单纯打印，可以使用`TextIteratorStreamer`来替代`TextStreamer`，如：
+
+```python
+from transformers import TextIteratorStreamer
+
+streamer = TextIteratorStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
+outputs = model.generate(
+    **tokenizer(text, return_tensors="pt").to("cuda"),
+    max_new_tokens=256,  # Increase for longer outputs!
+    temperature=0.7, top_p=0.8, top_k=20,  # For non thinking
+    streamer=streamer
+)
+```
+
+它最终拿到的**outputs**和使用`TextSteamer`一样，不同的是它不会进行打印，并且`streamer`是一个类似于迭代器的对象，可以通过遍历它来拿到新生成的**token**（需要事先在后台线程中开启`generate`方法，这样它才会在后台不断把新生成的**token**放进迭代器内）：
+
+```python
+from transformers import TextIteratorStreamer
+from threading import Thread
+
+streamer = TextIteratorStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
+parameters = dict(
+    **tokenizer(text, return_tensors="pt").to("cuda"),
+    max_new_tokens=256,  # Increase for longer outputs!
+    temperature=0.7, top_p=0.8, top_k=20,  # For non thinking
+    streamer=streamer
+)
+background_thread = Thread(target=model.generate, kwargs=parameters)
+background_thread.start()
+
+for new_token in streamer:
+	print("###" + new_token + "$$$")
+```
+
+这将得到：
+
+```text
+###你好$$$
+###$$$
+###！很高兴$$$
+###见到$$$
+###你$$$
+###$$$
+###$$$
+###！😊 $$$
+###有什么$$$
+###我可以$$$
+###帮$$$
+###你的$$$
+###吗$$$
+###$$$
+###？无论是$$$
+###聊天$$$
+###$$$
+###、解决问题$$$
+###$$$
+###，还是$$$
+###单纯$$$
+###想$$$
+###找个$$$
+###伴$$$
+###儿$$$
+###聊聊$$$
+###$$$
+###，我$$$
+###都在$$$
+###这儿$$$
+###$$$
+###$$$
+###$$$
+###！✨$$$
+```
+
 ***
 
+#### 保存模型到本地
 
+使用`save_pretrained`接口进行已加载模型的保存：
 
+```python
+model.save_pretrained("path/to/somewhere")
+```
+
+它保存的模型精度为模型在内存中的精度，不可以进行指定
+
+后续可以直接使用此路径进行模型的加载
