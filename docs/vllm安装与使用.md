@@ -129,4 +129,24 @@ vllm serve /home/u/.cache/huggingface/hub/models--unsloth--Qwen3-32B/snapshots/5
 
 #### 指定聊天模板
 
-**vllm**默认使用模型所处文件夹的聊天模板，并会在内部进行缓存，所以需要手动进行更改以实现自定义聊天模板，使用选项`--chat-template`，指定其值为聊天模板的文件路径，即可使用自定义聊天模板对输入进行处理
+**vllm**默认使用模型所处文件夹的聊天模板，并会在内部进行缓存，所以需要手动进行更改以实现自定义聊天模板（或者修改原聊天模板文件并重启服务，不过建议保留原聊天模板文件），使用选项`--chat-template`，指定其值为聊天模板的文件路径，即可使用自定义聊天模板对输入进行处理
+
+#### 设定连接密钥
+
+使用选项`--api-key`，指定一个字符串作为连接密钥，这将要求请求端带上**Bear Token**的请求头，如：`Authorization: Bearer vllm-key`
+
+#### 工具调用
+
+对于非**MCP**的工具调用（这往往称之为**function calling**)，通常的处理过程是手动在请求中添加**function**字段，**vllm**处理时会用聊天模板对该字段进行处理以嵌入上下文，模型续写后的结果往往采用不同的格式表示本质一样结构化信息，需要采用各家模型对应的解析器从中解析，下面给出两个选项：`--enable-auto-tool-choice`和`--tool-call-parser`，如果要让**vllm**支持**function calling**，则需要对这两个选项进行设定。前者不需要选项值，后者需要前者指定后方可指定，后者选项值即为模型输出的结构化信息解析器，具体值需要去各家的模型文档中查看，使用命令：`vllm serve --help=FrontEnd | grep tool-call-parser`可以查看**vllm**支持哪些解析器：
+
+```
+  --tool-call-parser {deepseek_v3,deepseek_v31,glm45,granite-20b-fc,granite,hermes,hunyuan_a13b,internlm,jamba,kimi_k2,llama4_pythonic,llama4_json,llama3_json,longcat,minimax,mistral,openai,phi4_mini_json,pythonic,qwen3_coder,qwen3_xml,seed_oss,step3,xlam} or name registered in --tool-parser-plugin  
+```
+
+如**qwen3**官方文档中提到有示例：
+
+```
+vllm serve Qwen/Qwen3-8B --enable-auto-tool-choice --tool-call-parser hermes
+```
+
+则可以判定其使用的解析器为**hermes**
