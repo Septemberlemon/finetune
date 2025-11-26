@@ -15,17 +15,17 @@ def run_messages(model, tokenizer, dialogue_history=None):
             print(message["content"])
     streamer = TextStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
     while True:
-        if dialogue_history[-1]["role"] != "user":
-            # 接收用户输入
-            user_input = input("user：\n")
-
-            # 检查退出条件
-            if user_input == "/quit":
-                print("--- 对话结束 ---")
-                break
-
-            # 将用户输入追加到对话历史中
-            dialogue_history.append({"role": "user", "content": user_input})
+        # if dialogue_history[-1]["role"] != "user":
+        #     # 接收用户输入
+        #     user_input = input("user：\n")
+        #
+        #     # 检查退出条件
+        #     if user_input == "/quit":
+        #         print("--- 对话结束 ---")
+        #         break
+        #
+        #     # 将用户输入追加到对话历史中
+        #     dialogue_history.append({"role": "user", "content": user_input})
 
         # 格式化完整的对话历史，为模型生成做准备
         text = tokenizer.apply_chat_template(
@@ -54,3 +54,4 @@ def run_messages(model, tokenizer, dialogue_history=None):
 
         # 将模型回答追加到对话历史中
         dialogue_history.append({"role": "assistant", "content": assistant_response})
+        assert 0
