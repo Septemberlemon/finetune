@@ -786,3 +786,13 @@ model.save_pretrained("path/to/somewhere")
 它保存的模型精度为模型在内存中的精度，不可以进行指定
 
 后续可以直接使用此路径进行模型的加载
+
+***
+
+## 添加新token
+
+首先介绍一些查看特殊**token**的方法：
+
+`tokenizer.all_special_tokens`：查看所有的特殊**token**
+
+`tokenizer.all_special_tokens_extended`：这同样是查看所有的特殊**token**，与上面不同的的是，它展示的是未合并

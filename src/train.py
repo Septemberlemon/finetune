@@ -15,10 +15,10 @@ model, tokenizer = FastLanguageModel.from_pretrained(
     full_finetuning=FULL_FINETUNE,  # We have full finetuning now!
 )
 
-tokenizer = get_chat_template(
-    tokenizer,
-    chat_template=CHAT_TEMPLATE,  # change this to the right chat_template name
-)
+# tokenizer = get_chat_template(
+#     tokenizer,
+#     chat_template=CHAT_TEMPLATE,  # change this to the right chat_template name
+# )
 
 train_dataset = get_dataset(train_dataset_path)
 eval_dataset = get_dataset(eval_dataset_path)

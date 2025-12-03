@@ -21,18 +21,6 @@ messages = [
     {
         "role": "user",
         "content": "在忙什么呢"
-    },
-    {
-        "role": "assistant",
-        "content": "在想某个笨蛋有没有想我呀"
-    },
-    {
-        "role": "assistant",
-        "content": "你呢"
-    },
-    {
-        "role": "assistant",
-        "content": "有没有想我"
     }
 ]
 # run_a_message(model, tokenizer, messages)

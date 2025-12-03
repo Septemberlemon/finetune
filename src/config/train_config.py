@@ -1,5 +1,5 @@
 # 训练名称
-train_name = "bad_woman_32b_split"
+train_name = "bad_woman_32b_split_newline"
 
 # 项目根目录
 root_path = "/home/u/finetune"
