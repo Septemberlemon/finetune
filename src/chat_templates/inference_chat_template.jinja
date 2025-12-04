@@ -75,7 +75,4 @@
 {%- endfor %}
 {%- if add_generation_prompt and (messages|last).role != "assistant" %}
     {{- '<|im_start|>assistant\n' }}
-    {%- if enable_thinking is defined and enable_thinking is false %}
-        {{- '<think>\n\n</think>\n\n' }}
-    {%- endif %}
 {%- endif %}

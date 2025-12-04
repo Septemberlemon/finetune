@@ -5,11 +5,11 @@ train_name = "zhoujie"
 root_path = "/home/u/finetune"
 
 # 数据集文件路径
-train_dataset_path = root_path + "/data/chat_history/周杰_full.json"
-eval_dataset_path = root_path + "/data/bad_woman/eval.json"
+train_dataset_path = root_path + "/data/chat_history/周杰_train.json"
+eval_dataset_path = root_path + "/data/chat_history/周杰_eval.json"
 
 # 数据集格式化信息
-conversations_key_name = "conversations"
+conversations_key_name = "messages"
 sharegpt_style = True
 
 # 模型保存路径

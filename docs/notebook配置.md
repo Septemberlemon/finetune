@@ -84,7 +84,7 @@ Environment="TRANSFORMERS_OFFLINE="1""
 
 [https://github.com/unslothai/unsloth/blob/69a64758e56fe94f103cb00da078db27ff886cf3/unsloth/models/_utils.py#L1001](https://github.com/unslothai/unsloth/blob/69a64758e56fe94f103cb00da078db27ff886cf3/unsloth/models/_utils.py#L1001)
 
-需要注意的是如果设置了上述环境变量会在下载新模型时导致问题，建议使用代码下载新模型时手动先在代码中删除这两个环境变量，或者使用**huggingface cli**下载模型。
+需要注意的是如果设置了上述环境变量会在下载新模型时导致问题，建议使用代码下载新模型时手动先在代码中删除这三个环境变量，或者使用**huggingface cli**下载模型。
 
 ## 一些常用快捷键
 
