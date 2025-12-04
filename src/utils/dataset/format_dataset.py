@@ -12,10 +12,10 @@ def format_dataset(dataset, tokenizer, conversations_key_name="conversations", s
                     message_text = message["content"]
                     split_message_text = message_text.split("\n")
                     for i, fragment in enumerate(split_message_text):
-                        if i == len(split_message_text) - 1:
-                            split_conversation.append({"role": "assistant", "content": fragment.strip() + "\n"})
-                        else:
-                            split_conversation.append({"role": "assistant", "content": fragment.strip()})
+                        # if i == len(split_message_text) - 1:
+                        #     split_conversation.append({"role": "assistant", "content": fragment.strip() + "\n"})
+                        # else:
+                        split_conversation.append({"role": "assistant", "content": fragment.strip()})
                 else:
                     split_conversation.append(message)
             temp = tokenizer.apply_chat_template(split_conversation, tokenize=False, add_generation_prompt=False)

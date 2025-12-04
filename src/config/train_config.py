@@ -1,11 +1,11 @@
 # 训练名称
-train_name = "bad_woman_32b_split_newline"
+train_name = "zhoujie"
 
 # 项目根目录
 root_path = "/home/u/finetune"
 
 # 数据集文件路径
-train_dataset_path = root_path + "/data/bad_woman/train.json"
+train_dataset_path = root_path + "/data/chat_history/周杰_full.json"
 eval_dataset_path = root_path + "/data/bad_woman/eval.json"
 
 # 数据集格式化信息

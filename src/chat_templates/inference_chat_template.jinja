@@ -31,13 +31,13 @@
         {%- endif %}
         {%- if reasoning_content %}
             {%- if loop.last %}
-                {{- '<|im_start|>' + message.role + '\n<think>\n\n' + reasoning_content.strip('\n') + '</think>\n\n' + content.lstrip('\n') -}}
+                {{- '<|im_start|>' + message.role + '\n<think>\n\n' + reasoning_content.strip('\n') + '</think>\n\n' + content.lstrip('\n') + "\n" -}}
             {%- else %}
                 {{- '<|im_start|>' + message.role + '\n<think>\n\n' + reasoning_content.strip('\n') + '</think>\n\n' + content.lstrip('\n') + "<|im_end|>\n" -}}
             {% endif %}
         {%- else %}
             {%- if loop.last %}
-                {{- '<|im_start|>' + message.role + '\n' + content -}}
+                {{- '<|im_start|>' + message.role + '\n' + content + "\n" -}}
             {%- else %}
                 {{- '<|im_start|>' + message.role + '\n' + content + "<|im_end|>\n" -}}
             {% endif %}
@@ -73,7 +73,7 @@
         {%- endif %}
     {%- endif %}
 {%- endfor %}
-{%- if add_generation_prompt and messages|last.role != "assistant" %}
+{%- if add_generation_prompt and (messages|last).role != "assistant" %}
     {{- '<|im_start|>assistant\n' }}
     {%- if enable_thinking is defined and enable_thinking is false %}
         {{- '<think>\n\n</think>\n\n' }}
