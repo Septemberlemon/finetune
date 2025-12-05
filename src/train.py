@@ -2,6 +2,7 @@ from unsloth import FastLanguageModel
 from unsloth.chat_templates import get_chat_template
 from trl import SFTTrainer, SFTConfig
 from transformers import EarlyStoppingCallback
+from unsloth.chat_templates import train_on_responses_only
 from config.train_config import *
 from utils.dataset.get_dataset import get_dataset
 from utils.dataset.format_dataset import format_dataset
@@ -73,6 +74,12 @@ trainer = SFTTrainer(
     ),
 )
 
+# trainer = train_on_responses_only(
+#     trainer,
+#     instruction_part="<|im_start|>user\n",
+#     response_part="<|im_start|>assistant\n",
+# )
+
 early_stopping_callback = EarlyStoppingCallback(
     early_stopping_patience=3,  # How many steps we will wait if the eval loss doesn't decrease
     # For example the loss might increase, but decrease after 3 steps
@@ -80,7 +87,6 @@ early_stopping_callback = EarlyStoppingCallback(
     # we consider early stopping. For eg 0.01 means if loss was
     # 0.02 then 0.01, we consider to early stop the run.
 )
-
 
 if __name__ == "__main__":
     trainer.add_callback(early_stopping_callback)
