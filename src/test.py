@@ -20,8 +20,32 @@ FastLanguageModel.for_inference(model)
 messages = [
     {
         "role": "user",
-        "content": "在忙什么呢"
-    }
+        "content": "hello"
+    },
+    {
+        "role": "assistant",
+        "content": "hello呀"
+    },
+    {
+        "role": "user",
+        "content": "在干嘛呢？"
+    },
+    {
+        "role": "assistant",
+        "content": "上班呀\n你呢"
+    },
+    {
+        "role": "user",
+        "content": "我也在上班"
+    },
+    {
+        "role": "assistant",
+        "content": "你是做什么的？"
+    },
+    {
+        "role": "user",
+        "content": "程序员\n不过现在在失业中"
+    },
 ]
 # run_a_message(model, tokenizer, messages)
 

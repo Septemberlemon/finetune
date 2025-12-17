@@ -1,5 +1,5 @@
 # 训练名称
-train_name = "bad_woman_new"
+train_name = "temp"
 
 # 项目根目录
 root_path = "/home/u/finetune"

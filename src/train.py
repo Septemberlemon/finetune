@@ -74,11 +74,11 @@ trainer = SFTTrainer(
     ),
 )
 
-# trainer = train_on_responses_only(
-#     trainer,
-#     instruction_part="<|im_start|>user\n",
-#     response_part="<|im_start|>assistant\n",
-# )
+trainer = train_on_responses_only(
+    trainer,
+    instruction_part="<|im_start|>user",
+    response_part="<|im_start|>",
+)
 
 early_stopping_callback = EarlyStoppingCallback(
     early_stopping_patience=3,  # How many steps we will wait if the eval loss doesn't decrease
