@@ -12,6 +12,8 @@ git clone https://github.com/nelvko/clash-for-linux-install.git
 cd clash-for-linux-install
 ```
 
+接下来编辑**.env**文件，指定内核版本和安装位置，前者建议使用新版的**mihomo**，后者指定为当前用户拥有权限的目录即可，如当前用户家目录下的某个路径，不要在路径中使用`~`，否则下一步的安装会使用`sudo`提权可能会导致错误
+
 下一步可以使用**订阅文件**或者**订阅url**进行配置，
 
 #### 首先是采用**订阅url**的方式：
@@ -75,3 +77,16 @@ sudo bash install.sh
 再将上述`clashui`命令输出中的**内网url**中的**base**部分（此例中为`http://172.23.96.49:9090`）粘贴到**API Base URL**栏，点击**Add**，再点击下方新增的按钮上的**url**即可登录**Web控制台**。
 
 退出登录位置在左侧**Config**选项卡的**Switch Backend**按钮。
+***
+
+## 一些额外说明
+
+如果安装的是**mihomo**内核，那么实际上底层启动的是**mihomo.service**，可以查看它的状态
+
+使用`clashon`实际上做了两件事，一是检查这个服务是否开启，若未开启则开启之、二是将代理相关的环境变量加载到**shell**中，`clashoff`则是对应的关闭服务和擦除环境变量
+
+这意味着在一次登陆后执行`clashon`之后，若未执行`clashoff`即断开连接，**mihomo.service**实际上仍然在运行，只是环境变量随**shell**一同消散了，下次登陆后，**mihomo.service**仍然在运行，只是**shell**因为是新加载的，所以里面没有代理相关的环境变量，此时执行`clashon`即可写入环境变量
+
+对于长期运行的**service**，可以在代码内手动指定**proxy**为**mihomo**对应的代理端口，或者在**service**配置文件中写明
+
+对于继承自**shell**的程序，例如在**shell**中执行**python**，其代理相关环境变量将也被继承过去，这点需要注意，另外若将**python**配置成**service**则不会继承**shell**的环境变量
