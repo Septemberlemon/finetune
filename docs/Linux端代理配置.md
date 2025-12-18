@@ -90,3 +90,5 @@ sudo bash install.sh
 对于长期运行的**service**，可以在代码内手动指定**proxy**为**mihomo**对应的代理端口，或者在**service**配置文件中写明
 
 对于继承自**shell**的程序，例如在**shell**中执行**python**，其代理相关环境变量将也被继承过去，这点需要注意，另外若将**python**配置成**service**则不会继承**shell**的环境变量
+
+`clashon`本身是一个**shell**函数，它被`clashctl.sh`加载，在安装完成后可以查看**.bashrc**文件，底部将有一个加载`clashctl.sh`的部分，它实际上就是把其内的各个函数加载到**shell**中。每次一个新**shell**启动之后，**.bashrc**文件将被加载，`clashctl.sh`随之加载，`clashon`等函数随之被写入
